@@ -1,0 +1,124 @@
+---
+title: "Week 4: Fertility"
+subtitle: "SOC6708 ADA"
+author: "Monica Alexander"
+format: pdf
+execute: 
+  warning: false
+  message: false
+---
+
+# NRRs
+
+```{r}
+library(tidyverse)
+library(here)
+library(readxl)
+library(janitor)
+```
+
+Read in WPP data (you will need to download the first two files from the UNPD website):
+
+```{r}
+df <- read_csv("../data/WPP2024_Fertility_by_Age5.csv")
+dl <- read_csv("../data/WPP2024_Life_Table_Abridged_Medium_1950-2023.csv")
+dp <- read_csv("../data/wpp_pop_clean.csv")
+```
+
+## Exercise
+
+Choose three countries in varying demographic stages and calculate and plot the NRR over time. Also plot population pyramids for these same countries (one recent, one from 1970) and discuss how population growth/decline and NRR are related. 
+
+# Parity
+
+For this section, I pulled Canadian census data from 2011 from [IPUMS](https://international.ipums.org/international/) and did some reshaping to get mothers and their children:
+
+```{r}
+d <- read_csv("../data/canada_parity.csv")
+```
+
+Let's look at sex ratios by parity:
+
+```{r}
+dy <- d |> 
+  filter(child_age_1<21)
+
+pf1 <- dy |> 
+  group_by(child_age_1) |> 
+  summarise(prop_female1 = sum(child_sex_1==2)/n()) |> 
+  rename(age = child_age_1)
+
+pf2 <- dy |> 
+  group_by(child_age_2) |> 
+  summarise(prop_female2 = sum(child_sex_2==2)/n()) |> 
+  rename(age = child_age_2)
+
+pf3 <- dy |> 
+  group_by(child_age_3) |> 
+  summarise(prop_female3 = sum(child_sex_3==2)/n()) |> 
+  rename(age = child_age_3)
+
+
+pf1 |> 
+  left_join(pf2) |> 
+  left_join(pf3) |>
+  pivot_longer(-age, names_to = "parity", values_to = "prop_female") |> 
+  mutate(parity = as.numeric(substr(parity, nchar(parity), nchar(parity)))) |> 
+  ggplot(aes(age, prop_female, color = factor(parity))) + 
+  geom_line(alpha = 0.5) + 
+  ggtitle("Proportion of females by age and parity") +
+  geom_hline(yintercept = 0.4886)+
+  geom_smooth(method = "lm", se = F, formula = y ~ 1)+
+  scale_color_discrete(name = "Parity")+
+  labs(y = "proportion female", x = "age of child")
+
+```
+
+Now let's look at parity progression from 1 to 2 based on sex of first child:
+
+```{r}
+ppr1 <- dy |> 
+  group_by(child_age_1, child_sex_1) |> 
+  summarise(ppr1 = sum(nchild>1)/n()) |> 
+  rename(sex = child_sex_1, age = child_age_1)
+
+ppr1 |> 
+  rename(ppr = ppr1) |> 
+  ggplot(aes(age, ppr, color = factor(sex))) + 
+  geom_point()+
+  ggtitle("Parity progression ratios for 1st to 2nd child by sex of first child")  +
+  scale_color_discrete(name = "Sex of first child")+labs(x = "age of child")
+```
+
+What about from 2 to 3, based on the sex of the first two?
+
+```{r}
+ppr2_m <- dy |> 
+  filter(child_age_2<16) |> 
+  filter(child_sex_1==1) |> 
+  group_by(child_age_2, child_sex_2) |> 
+  summarise(ppr2 = sum(nchild>2)/n()) |> 
+  rename(sex = child_sex_2, age = child_age_2) |> 
+  mutate(sex1 = "first born is male")
+
+ppr2_f <- dy |> 
+  filter(child_age_2<16) |> 
+  filter(child_sex_1==2) |> 
+  group_by(child_age_2, child_sex_2) |> 
+  summarise(ppr2 = sum(nchild>2)/n()) |> 
+  rename(sex = child_sex_2, age = child_age_2) |> 
+  mutate(sex1 = "first born is female")
+
+ppr2_m |> 
+  bind_rows(ppr2_f) |> 
+  mutate(sex = ifelse(sex == 1, "Male", "Female")) |> 
+  ggplot(aes(age, ppr2, color = factor(sex))) + facet_grid(~sex1) + 
+  geom_point() + 
+  ggtitle("Parity progression ratios to third child by sex of first two children \nCanada 2011") + 
+  scale_color_discrete(name = "sex of second born") + 
+  ylab("PPR")+xlab("age of child")
+```
+
+## Exercise
+
+Repeat the graph above (PPR from 2 to 3, based on sex of first two children), but plot by age group of mother. Comment on observatios in one sentence. 
