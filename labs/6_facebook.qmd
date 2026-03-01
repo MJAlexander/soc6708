@@ -55,7 +55,7 @@ version <- "v25.0"
 
 ```{r}
 #| eval: false
-# insert your version number  (it is most likely v18.0)
+# insert your version number  (it is most likely v25.0)
 version <- "vxx.x" 
 ```
 
@@ -65,7 +65,7 @@ We also need to get the app token, which is unique to your app. From the menu go
 
 ```{r}
 #| echo: false
-token <- "EAAUaGJonI8sBQZBZBhwJjNjFmSq1R2yKre85WzvaspIEfqUR6V2yBgJuW7iJxCMNjVkuTK6ox9aHOhYZCYKPqEMFCZCW2boJ2U5MV8FkQ6v7wqufNEuEo4fmeoz2To4hoc2CSqLqOC2LkUtarPYVEIEGauzeihVIMZBqfXnLuxlZAZCMgfQ0kljttYnhC8EcCNqPop8wGx8nZA5vOkLoQeae6Ybsqy83JOpQIRZCN6wLL0ZCiJBMve47ZA6QFoyOK8SDUSSZAh1szkakuwZC4QCw8FBmcawZDZD"
+token <- "EAA2c9r8sEnIBQxn0ZBudbgbJkCBzG2Uk2Rztu4ZBrcnOJvTGNjUUWhREchzCGJ2S5MTvQ64VVZA9PxJYTdVZAg8tXFACUuALaDeVRR3g93nHD1uIEZBh3DVjmsqke8YLlvwD8nZBZAFMh350tQvpMzZCEADZBtHcQbInZBCNmClGaXm90rfpOm4kHQjLIAVUGZBhKbPePZBlkc5L4SiLQAQUSONRaPuUgw5gZBClMnwZDZD"
 ```
 
 ```{r}
@@ -199,6 +199,31 @@ demographics_df <- GET(
   query=list(
     type='adTargetingCategory',
     class='demographics',
+    access_token=token,
+    limit=2000
+  ))  %>%
+  content(as="text", encoding = "UTF-8") %>% 
+  fromJSON %>%
+  .[[1]]
+
+
+interests_df <- GET(
+  "https://graph.facebook.com/v25.0/search",
+  query=list(
+    type='adTargetingCategory',
+    class='interests',
+    access_token=token,
+    limit=2000
+  ))  %>%
+  content(as="text", encoding = "UTF-8") %>% 
+  fromJSON %>%
+  .[[1]]
+
+behaviors_df <- GET(
+  "https://graph.facebook.com/v25.0/search",
+  query=list(
+    type='adTargetingCategory',
+    class='behaviors',
     access_token=token,
     limit=2000
   ))  %>%
@@ -537,6 +562,7 @@ For example, let's get the key and estimate of users in Toronto:
     content(as="text", encoding = "UTF-8") %>% 
     fromJSON %>% 
     .[[1]]
+
 ```
 
 ```{r}

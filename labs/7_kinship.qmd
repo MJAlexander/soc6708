@@ -1,0 +1,323 @@
+---
+title: "Week 7: Kinship"
+subtitle: "SOC6708 ADA"
+author: "Monica Alexander"
+format: pdf
+execute: 
+  warning: false
+  message: false
+---
+
+In this lab we will be calculating surviving daughters and mothers using the GKP equations, and also exploring matrix-based models using `DemoKin`.
+
+# Load in data
+
+Note you will have to install the DemoKin package.
+```{r}
+library(tidyverse)
+library(readxl)
+library(DemoKin)
+```
+
+For the GKP we will be using fertility and mortality rates from WPP; we also need to load in the file that has summary indicators. You should have these files from previous weeks. 
+
+```{r}
+df <- read_csv("../data/WPP2024_Fertility_by_Age5.csv")
+dm <- read_csv("../data/WPP2024_Life_Table_Abridged_Medium_1950-2023.csv")
+di <- read_csv("../data/WPP2024_Demographic_Indicators_Medium.csv")
+```
+
+For the matrix models, we will use fertlity and mortality rates by single year of age. I've already cleaned these up (the file is in the repo).
+
+```{r}
+ds <- read_csv("../data/wpp_pop_fx_px_female.csv")
+```
+
+# Goodman-Keyfitz-Pullum equations
+
+## Surviving daughters
+
+Let's look at the surviving daughters in Kenya over time. 
+
+First, clean up the fertility and mortality data:
+```{r}
+fert <- df |> 
+  filter(Location == "Kenya") |> 
+  select(Time, AgeGrp, ASFR) |> 
+  mutate(age = as.numeric(str_remove(AgeGrp, "-.*")))
+
+mort <- dm |> 
+  filter(Location == "Kenya", Sex == "Female") |> 
+  select(Time, AgeGrp, lx) |> 
+  filter(AgeGrp!="1-4")|> # don't need this
+  mutate(age = as.numeric(str_remove(AgeGrp, "-.*")))
+```
+
+### Exercise
+
+Do a couple of graphs to show how fertility and mortality have changed over time. 
+
+Let's calculate expected number of surviving daughters over time for a 60 year old:
+
+```{r}
+a <- 60
+
+surviving_daughters <- fert |> 
+  mutate(shifted_age = a - age) |> 
+  left_join(mort |> rename(shifted_age = age) |> 
+              select(-AgeGrp) ) |> 
+  mutate(prod = ASFR*5*0.4886/1000*lx/100000) |> 
+  group_by(Time) |> 
+  summarize(daughters = sum(prod)) |> 
+  filter(Time < 2024)
+```
+
+Plot this:
+
+```{r}
+surviving_daughters |> 
+  ggplot(aes(Time, daughters)) + 
+  geom_line()+
+  labs(y = "Surviving daughters", title = "Expected number of surviving daughters for a 60 year woman, Kenya")
+```
+### Exercise
+
+Compare the trajectory above to the trajectory of TFR for Kenya. Explain the similarities / differences.
+
+
+## Surviving mothers
+
+To calculate the probability that a mother is still alive, we need to calculate $W_x$, which is the age distribution of mothers. We'll calculate this using stable population assumptions as in the lecture notes, which requires first calculating the stable growth rate $r$. I'm using the approximation from week 5, i.e.
+$$
+r \approx \frac{NRR}{\mu}
+$$
+
+where $\mu$ is the mean age at childbearing. 
+
+```{r}
+dr <- di |> 
+  filter(Location=="Kenya") |> 
+  select(Time, NRR, MAC) |> 
+  mutate(r = NRR/MAC)
+
+Wx <- mort |> 
+  left_join(fert) |> 
+  mutate(ASFR = ifelse(is.na(ASFR), 0, ASFR)) |> 
+  mutate(age = ifelse(is.na(age), 100, age)) |> 
+  mutate(prod = ASFR*5*0.4886/1000*lx/100000) |> 
+  left_join(dr) |> 
+  mutate(dist = exp(-1*r*age)*prod) |> 
+  group_by(Time) |> 
+  mutate(sum = sum(dist)) |> 
+  mutate(prop = dist/sum) # renormalize
+
+```
+
+Plot a couple of years to make sure it broadly makes sense
+
+```{r}
+Wx |> 
+  filter(Time == 2023|Time == 1950) |> 
+  ggplot(aes(age, prop, fill = factor(Time))) + 
+  geom_bar(stat = "identity", position = 'dodge')+
+  scale_fill_brewer(palette = "Set1", name = "Year")+
+  labs(y = "Proportion of mothers", title = "Age distribution of mothers, Kenya")
+
+```
+Now we have this age distribution, we can calculate the probability that a mother is alive. For this one, let's use ego age = 45.
+
+```{r}
+
+a <- 45
+
+age_shifted = seq(0, 100, by = 5) + a
+
+# shift mortality rates
+mort_shift <- mort |> 
+  mutate(age = ifelse(is.na(age), 100, age)) |> 
+  filter(age %in% age_shifted) |> 
+  rename(lx_shifted = lx, age_shifted = age) |> 
+  select(-AgeGrp)
+
+surviving_mothers <- mort |> 
+  mutate(age_shifted = age + a) |> 
+  left_join(mort_shift) |> 
+  mutate(lx_shifted = ifelse(is.na(lx_shifted), 0, lx_shifted)) |> 
+  left_join(fert) |> 
+  mutate(ASFR = ifelse(is.na(ASFR), 0, ASFR)) |> 
+  left_join(Wx |> 
+              select(Time, AgeGrp, age, prop)) |> 
+  mutate(ratio = lx_shifted/lx) |> 
+  mutate(prod = prop*ratio) |> 
+  drop_na(age) |> 
+  group_by(Time) |> 
+  summarize(M1 = sum(prod)) 
+```
+
+```{r}
+surviving_mothers|> 
+  ggplot(aes(Time, M1)) + 
+  geom_line()+
+  labs(y = "Probability", title = "Probability that mother is still alive for Kenyan woman aged 45")
+```
+### Question for you
+
+How would you convert this probability into the number of 45 women in Kenya who have lost their mother (say, in 2023)?
+
+# DemoKin
+
+Now we will use the `DemoKin` package to calculate surviving kin of different types (female only) in Canada. This code replicates the plots in the lecture notes. 
+
+Let's get the fertility and mortality rates in the right format:
+
+```{r}
+asfr_2023 <- ds |> 
+  filter(region=="Canada") |> 
+  filter(year==2023) |> 
+  select(age, year, fx) |> 
+  mutate(fx = fx/1000) |> 
+  pivot_wider(names_from = year, values_from = fx) |>
+  select(-age) |>
+  as.matrix()
+
+surv_2023 <- ds |> 
+  filter(region=="Canada") |> 
+  filter(year==2023) |> 
+  select(age, year, px) |> 
+  pivot_wider(names_from = year, values_from = px) |>
+  select(-age) |>
+  as.matrix()
+```
+
+The main function in the DemoKin package is then `kin`, which takes an inputs fertility and survival matrices. 
+
+```{r}
+kin_2023 <- kin(p = surv_2023, f = asfr_2023, time_invariant = TRUE)
+```
+
+This object has two elements, a full description and a summary. 
+
+```{r}
+kin_2023$kin_summary
+```
+
+Note that this kin column refers to different types of kin, to make this more readable we can use the `rename_kin` function:
+
+```{r}
+kin_2023$kin_summary |> 
+  rename_kin()
+```
+For example, let's look at the number of surviving daughters to 60 year olds:
+
+```{r}
+kin_2023$kin_summary |> 
+  rename_kin() |> 
+  filter(kin_label == "Daughters", age_focal==60)
+```
+We can plot a tree summary for a 45 year old:
+
+```{r}
+kin_2023$kin_summary |> 
+  filter(age_focal == 45) |> 
+  select(kin, count = count_living) |> 
+  plot_diagram(rounding = 2)
+```
+
+We can specify the types of kin we are interested in. 
+
+```{r}
+kin_2023 <- 
+  kin(
+    p = surv_2023
+    , f = asfr_2023
+    , output_kin = c("c", "d", "gd", "ggd", "gm", "m", "n", "a", "s")
+    , time_invariant = TRUE
+  )
+```
+
+Then plot the number surviving over age
+
+```{r}
+kin_2023$kin_summary |>
+  rename_kin() |>
+  ggplot() +
+  geom_line(aes(age_focal, count_living))  +
+  theme_bw() +
+  labs(x = "Age of focal", y= "Number of living female relatives") +
+  facet_wrap(~kin_label)
+```
+
+Combine these counts:
+
+```{r}
+counts <- 
+  kin_2023$kin_summary |>
+  group_by(age_focal) |> 
+  summarise(count_living = sum(count_living)) |> 
+  ungroup()
+
+kin_2023$kin_summary |>
+  select(age_focal, kin, count_living) |> 
+  rename_kin() |> 
+  ggplot(aes(x = age_focal, y = count_living)) +
+  geom_area(aes(fill = kin_label), colour = "black") +
+  geom_line(data = counts, linewidth = 2) +
+  labs(x = "Age of focal",
+       y = "Number of living female relatives",
+       fill = "Kin") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+Finally, we can plot the age distribution of relatives for Canadian women aged 65.
+
+```{r}
+kin_2023$kin_full |>
+  rename_kin() |>
+  filter(age_focal == 65) |>
+  ggplot(aes(age_kin, living)) +
+  geom_line() +
+  geom_vline(xintercept = 65, colour = "red") +
+  labs(x = "Age of kin",
+       y = "Expected number of living relatives") +
+  theme_bw() +
+  facet_wrap(~kin_label)
+```
+
+Can repeat the same exercise using time varying rates:
+
+```{r}
+asfr <- ds |> 
+  filter(region=="Canada") |> 
+  select(age, year, fx) |> 
+  mutate(fx = fx/1000) |> 
+  pivot_wider(names_from = year, values_from = fx) |>
+  select(-age) |>
+  as.matrix()
+
+surv <- ds |> 
+  filter(region=="Canada") |> 
+  select(age, year, px) |> 
+  pivot_wider(names_from = year, values_from = px) |>
+  select(-age) |>
+  as.matrix()
+
+kin_tv <- kin(p = surv, f = asfr, time_invariant = FALSE, 
+              output_kin = c("c", "d", "gd", "ggd", "gm", "m", "n", "a", "s"))
+
+kin_tv$kin_full |> 
+  filter(year==2023) |> 
+  rename_kin() |>
+  filter(age_focal == 65) |>
+  ggplot(aes(age_kin, living)) +
+  geom_line() +
+  geom_vline(xintercept = 65, colour = "red") +
+  labs(x = "Age of kin",
+       y = "Expected number of living relatives") +
+  theme_bw() +
+  facet_wrap(~kin_label)
+```
+
+### Exercise
+
+Pick another country to get the kinship structure for women. Compare to Canada and briefly discuss similarities and differences. 
