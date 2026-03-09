@@ -1,0 +1,78 @@
+---
+title: "Week 9: Intro to Bayes"
+date: today
+date-format: "DD/MM/YY"
+format: pdf
+execute: 
+  warning: false
+  message: false
+---
+
+# Happiness
+
+## Question 1
+
+Consider the happiness example from the lecture, with 118 out of 129 women indicating they are happy. We are interested in estimating $\theta$, which is the (true) proportion of women who are happy. Calculate the MLE estimate $\hat{\theta}$ and 95% confidence interval. 
+
+## Question 2
+
+Assume a Beta(1,1) prior on $\theta$. Calculate the posterior mean for $\hat{\theta}$ and 95% credible interval. 
+
+## Question 3
+
+Now assume a Beta(10,10) prior on $\theta$. What is the interpretation of this prior? Are we assuming we know more, less or the same amount of information as the prior used in Question 2?
+
+
+```{r}
+library(tidyverse)
+dp <- read_csv("../data/wpp_pop_clean.csv")
+df <- read_csv("../data/WPP2024_Demographic_Indicators_Medium.csv")
+dpf <- dp |> filter(region=="Canada", sex == "Female") |> 
+  pivot_longer(x0:x100) |> 
+  mutate(age = as.numeric(str_remove(name, "x")))
+
+dpm <- dp |> filter(region=="Canada", sex == "Male") |> 
+  pivot_longer(x0:x100) |> 
+  mutate(age = as.numeric(str_remove(name, "x")))
+
+breaks <- c(seq(0,100, by = 5), Inf)
+labels <- seq(0,100, by = 5)
+
+# Create the age groups
+dpf$age_group <- cut(dpf$age, 
+                  breaks = breaks, 
+                  labels = labels, 
+                  right = FALSE) 
+
+dpf5 <- dpf |> 
+  group_by(year, age_group) |> 
+  summarize(pop = sum(value))
+
+dpm$age_group <- cut(dpm$age, 
+                  breaks = breaks, 
+                  labels = labels, 
+                  right = FALSE) 
+
+dpm5 <- dpm |> 
+  group_by(year, age_group) |> 
+  summarize(pop = sum(value))
+
+dp5_23 <- dpf5 |> filter(year==2023)
+
+C <- dp5_23$pop[dp5_23$age_group==0] + dpm5$pop[dpm5$age_group==0&dpm5$year==2023]
+W <- dp5_23$pop[dp5_23$age_group==15]+dp5_23$pop[dp5_23$age_group==20]+dp5_23$pop[dp5_23$age_group==25]+dp5_23$pop[dp5_23$age_group==30]+dp5_23$pop[dp5_23$age_group==35]+dp5_23$pop[dp5_23$age_group==40]+dp5_23$pop[dp5_23$age_group==45]
+
+p <- 1/7
+s <- 1
+
+iTFR <- 1/s*1/p*C/W
+iTFR
+
+x_multiplier <- (10.65-12.55*(dp5_23$pop[dp5_23$age_group==25]+dp5_23$pop[dp5_23$age_group==30])/W)
+xTFR <- x_multiplier*C/W
+xTFR
+
+# the actual TFR is
+df |> filter(Location=="Canada") |> select(Time, TFR)
+```
+
