@@ -1,0 +1,38 @@
+---
+title: "Research Proposal and Presentation"
+author: "SOC6708"
+format: pdf
+---
+
+# Research proposal
+
+The final project for this class involves exploring a research question that you are interested in using techniques that we have covered in class. For the research proposal, I'm interested in finding out about your topic, and seeing some EDA based on your dataset of choice. Please describe 
+
+- your research question(s) of interest, and why they are of interest (if there's an obvious literature, feel free to cite a few papers)
+- the dataset you plan to use
+- an indication of the methods/model you plan to use
+
+## Descriptives about the data
+
+As part of your research proposal please summarize a few key things in your dataset related to your variables of interest. This could be in the form of graphs or tables. 
+## Description of method
+
+Briefly describe what method you plan to use, ideally with the aid of equations, if relevant.
+
+
+## What to submit
+
+Ideally you would write everything in Quarto. But Word is okay too. If you do your proposal in Word, please also submit any R code. 
+
+If your dataset is reasonably small (and publicly available), then it would be great if you could submit that, or at least some information about where it is (e.g. website URL) 
+
+Please submit files via Quercus. 
+
+# Presentation
+
+In the last week of class everyone will present on their project. It would be great if you have some results by then (even preliminary), but okay if not. Everyone will have about 10-15 mins to present. Presentations should be of the general form: Intro/motivation, data, method, findings (or expected findings), summary. 
+
+
+
+
+
