@@ -152,7 +152,7 @@ quantile(temp$beta, 0.975)  # upper
 ```{r}
 mod |> 
   gather_draws(log_alpha, beta) |> 
-  median_qi()
+  median_qi(.width = 0.99)
 ```
 
 
@@ -184,6 +184,33 @@ mod |>
 ## Question
 
 Check you get similar results using `lm` or `glm`.
+
+```{r}
+summary(lm(log_mx ~ age_c, data = d |> 
+             filter(!is.infinite(log_mx)) |> 
+                      mutate(age_c = age-40)
+                    ))
+
+d |> filter(!is.infinite(log_mx)) |> 
+              filter(pop>0) |> 
+                      mutate(age_c = age-40) |> 
+              mutate(deaths = as.integer(deaths), 
+                     pop = as.integer(pop)) |> 
+  filter(!is.infinite(deaths)) |> 
+  filter(!is.infinite(pop)) |> 
+  View()
+
+summary(glm(deaths ~ age_c + offset(log(pop)), 
+                                    family = "poisson",data = d |> filter(!is.infinite(log_mx)) |> 
+                      mutate(age_c = age-40) |> 
+              mutate(deaths = as.integer(deaths), 
+                     pop = as.integer(pop)) |> 
+                            filter(pop>0) |> 
+  filter(!is.infinite(deaths)) |> 
+  filter(!is.infinite(pop))
+        ))
+```
+
 
 # Model over time
 
