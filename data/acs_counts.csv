@@ -1,0 +1,61 @@
+age_gp,edu,marital,n
+20-24,<HS,Married,139727.34
+20-24,<HS,Formerly Married,20872.8
+20-24,<HS,Never Married,560836.08
+20-24,Bachelor+,Married,249771.15
+20-24,Bachelor+,Formerly Married,3512.25
+20-24,Bachelor+,Never Married,1781051.94
+20-24,HS,Married,325675.89
+20-24,HS,Formerly Married,62217
+20-24,HS,Never Married,2275998.21
+20-24,Some College,Married,486858.06
+20-24,Some College,Formerly Married,66632.4
+20-24,Some College,Never Married,4855013.28
+25-29,<HS,Married,317848.58999999997
+25-29,<HS,Formerly Married,84354.21
+25-29,<HS,Never Married,532457.1
+25-29,Bachelor+,Married,1506594.69
+25-29,Bachelor+,Formerly Married,95493.06
+25-29,Bachelor+,Never Married,2646349.92
+25-29,HS,Married,761295.24
+25-29,HS,Formerly Married,183700.71
+25-29,HS,Never Married,1429405.47
+25-29,Some College,Married,1344027.69
+25-29,Some College,Formerly Married,359413.56
+25-29,Some College,Never Married,2047280.49
+30-34,<HS,Married,512888.85
+30-34,<HS,Formerly Married,112572.63
+30-34,<HS,Never Married,349097.58
+30-34,Bachelor+,Married,2879342.55
+30-34,Bachelor+,Formerly Married,219706.28999999998
+30-34,Bachelor+,Never Married,1369837.71
+30-34,HS,Married,942025.59
+30-34,HS,Formerly Married,242867.07
+30-34,HS,Never Married,886853.16
+30-34,Some College,Married,1677009.06
+30-34,Some College,Formerly Married,497896.56
+30-34,Some College,Never Married,1312116.39
+35-39,<HS,Married,621648.18
+35-39,<HS,Formerly Married,216194.04
+35-39,<HS,Never Married,412538.85
+35-39,Bachelor+,Married,2779213.3200000003
+35-39,Bachelor+,Formerly Married,435017.25
+35-39,Bachelor+,Never Married,737432.01
+35-39,HS,Married,1050845.13
+35-39,HS,Formerly Married,405353.79
+35-39,HS,Never Married,526556.52
+35-39,Some College,Married,1687023.99
+35-39,Some College,Formerly Married,721396.08
+35-39,Some College,Never Married,776207.25
+40-44,<HS,Married,602501.4
+40-44,<HS,Formerly Married,245034.63
+40-44,<HS,Never Married,290392.83
+40-44,Bachelor+,Married,2740598.6399999997
+40-44,Bachelor+,Formerly Married,522241.47
+40-44,Bachelor+,Never Married,505844.28
+40-44,HS,Married,1183066.29
+40-44,HS,Formerly Married,558267.12
+40-44,HS,Never Married,415388.79
+40-44,Some College,Married,1698182.91
+40-44,Some College,Formerly Married,652636.26
+40-44,Some College,Never Married,496672.29

@@ -1,0 +1,201 @@
+---
+title: "Week 10: Multilevel regression and post-stratification"
+date: today
+date-format: "DD/MM/YY"
+format: pdf
+number-sections: true
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+# Overview
+
+In this lab we will look at an example of doing multilevel regression with the fertility intentions data. We will also go through how to do post-stratification and MRP. 
+
+
+# Packages and data
+
+Read in the data from [NSFG](https://www.cdc.gov/nchs/nsfg/index.htm):
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(rstan)
+d <- read_csv("../data/intentions.csv")
+d <- d |> 
+  mutate(educ_cat = ifelse(edu == "Bachelor"|edu == "Post-Grad", "Bachelor+", edu)) |> 
+  mutate(educ_cat = fct_relevel(educ_cat, "<HS", "HS", "Some College", "Bachelor+")) 
+```
+
+# Descriptives
+
+Let's do some brief descriptive plots. Here's the observed proportion of women wanting more kids by edication and age:
+
+```{r}
+d |>  
+  group_by(age_gp, educ_cat, wants_more_kids) |> 
+  tally() |> 
+  group_by(age_gp, educ_cat) |> 
+  summarize(prop_wants_more = n[wants_more_kids==1]/sum(n), n = sum(n)) |> 
+  filter(age_gp!="15-19") |> 
+  ggplot(aes(age_gp, prop_wants_more, fill = educ_cat)) +
+  labs(title = "Observed proportion of women wanting more kids", x = "age", y = "proportion")+
+  theme_bw()+
+  scale_fill_brewer(palette = "Set1", name = "education")+
+  geom_bar(stat = "identity", position = "dodge")
+```
+
+Here's a tile plot of the sample sizes:
+
+```{r}
+d |> group_by(age_gp, marital_formal, educ_cat) |> 
+  summarize(n = n()) |> 
+  filter(age_gp!="15-19") |> 
+  ggplot(aes(x=age_gp, y=marital_formal, fill=n)) + 
+  geom_tile() + 
+  scale_fill_gradient(low="white", high="grey") +
+  geom_text(aes(label=n), size=3) +
+  xlab("Age Group") + ylab("Marital Status") + theme_minimal()+facet_wrap(~educ_cat)
+```
+
+## Question
+
+Do another interesting descriptive chart of the data. 
+
+# Multilevel model
+
+Let's fit the same multilevel model as seen in the lecture using the `lme4` package
+
+```{r}
+resp4 <- d |> filter(age_gp!="15-19")  |> drop_na() |> mutate(age_gp = as_factor(age_gp)) |> 
+  mutate(age_gp = fct_relevel(age_gp, c("20-24", "25-29", "30-34", "35-39", "40-44")))
+
+mod <- glmer(wants_more_kids ~ marital_formal + (1|age_gp) + (1|educ_cat), data = resp4, family = "binomial")
+summary(mod)
+```
+
+Note! This can also be done in Stan, in a Bayesian framework. This is useful if you want to e.g. play around with the structure of the hierarchical model, which is much easier to control in this framework. 
+
+```{r}
+stan_data1 <- list(N = nrow(resp4),
+                  A = nlevels(resp4$age_gp),
+                  E = nlevels(resp4$educ_cat), 
+                  age = as.numeric(resp4$age_gp),
+                  edu = as.numeric(resp4$educ_cat), 
+                  x1 = as.numeric(resp4$marital_formal == 'Married'),
+                  x2 = as.numeric(resp4$marital_formal == 'Never Married'), 
+                  y = resp4$wants_more_kids)
+
+mod1 <- stan(data = stan_data1, 
+             file = "../code/models/intentions.stan",
+             iter = 1000,
+             seed = 243,
+             refresh=0)
+summary(mod1)$summary[c("beta0", "beta1", "beta2", "sigma_a", "sigma_e"),
+                      c("mean", "se_mean", "n_eff", "Rhat")]
+```
+
+To pull out the estimates from `lme4`:
+
+```{r}
+coef(mod)
+fixef(mod)
+ranef(mod)
+```
+
+
+## Question
+
+Compare the multilevel model with just a standard logistic regression. Which model has a higher AIC?
+
+# Post stratification
+
+We are interested in obtaining estimates for the proportion of women who want more kids by age. 
+## Raw proportions by age
+
+Before we do any post-stratification, we can just calculate the raw survey proportions by age:
+
+```{r}
+raw_age <- resp4 |> 
+  mutate(edu = ifelse(edu == "Bachelor"|edu=="Post-Grad", "Bachelor+", as.character(edu))) |> 
+  group_by(age_gp) |> 
+  summarize(proportion = mean(wants_more_kids, na.rm = TRUE)) |> 
+  mutate(estimate = "raw")
+```
+
+## Post-stratification dataset
+
+We are going to use data from the American Community Survey (ACS) as the post-stratification dataset. Note that I got these data from IPUMS USA. Load in ACS data:
+
+```{r}
+cell_counts <- read_csv("../data/acs_counts.csv")
+```
+
+## Question
+
+Compare proportions by age/education/marital group in ACS versus survey. 
+
+
+
+## Standard post-stratification
+
+Calculate the proportion by group (age, education, marital status) and then re-weight based on the ACS data:
+
+```{r}
+ps_age <- resp4 |> 
+  mutate(edu = ifelse(edu == "Bachelor"|edu=="Post-Grad", "Bachelor+", as.character(edu))) |> 
+  group_by(age_gp, edu, marital) |> 
+  summarize(prop = mean(wants_more_kids, na.rm = TRUE)) |> 
+  filter(marital !="Cohabitating") |> 
+  left_join(cell_counts) |> 
+  mutate(prod = prop*n) |> 
+  group_by(age_gp) |> 
+  summarize(proportion = sum(prod)/sum(n)) |> 
+  mutate(estimate = "poststrat")
+```
+
+
+
+## MRP
+
+Get predicted proportions for each group:
+
+```{r}
+age_groups <- rownames(coef(mod)$age_gp)
+educ_groups <- rownames(coef(mod)$educ_cat)
+marital_groups <- c("Formerly Married","Married", "Never Married")
+
+pred_data <- expand_grid(age_gp = age_groups, educ_cat = educ_groups, marital_formal = marital_groups)
+
+pred_mrp <- plogis(predict(mod, pred_data))
+
+pred_prop <- cbind(pred_data, pred_mrp)
+```
+
+Now post-stratify by age:
+
+```{r}
+mrp_age <- pred_prop |> 
+  rename(edu = educ_cat, marital = marital_formal) |> 
+  left_join(cell_counts) |> 
+  mutate(prod = pred_mrp*n) |> 
+  group_by(age_gp) |> 
+  summarize(proportion = sum(prod)/sum(n)) |> 
+  mutate(estimate = "mrp")
+```
+
+Compare on a plot:
+
+```{r}
+ps_age |> 
+  bind_rows(mrp_age) |> 
+  bind_rows(raw_age) |> 
+  ggplot(aes(age_gp, proportion, fill = estimate))+
+  geom_bar(stat = "identity", position = "dodge")
+```
+
+## Question
+
+Do the same thing but compare across education groups.
