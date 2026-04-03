@@ -65,6 +65,16 @@ d |> group_by(age_gp, marital_formal, educ_cat) |>
 
 Do another interesting descriptive chart of the data. 
 
+```{r}
+d |> 
+  filter(intention < 10) |> 
+  mutate(how_many_more = intention - parity) |> 
+  ggplot(aes(parity, how_many_more)) + 
+  geom_point()+
+  facet_wrap(~educ_cat)
+```
+
+
 # Multilevel model
 
 Let's fit the same multilevel model as seen in the lecture using the `lme4` package
@@ -75,6 +85,10 @@ resp4 <- d |> filter(age_gp!="15-19")  |> drop_na() |> mutate(age_gp = as_factor
 
 mod <- glmer(wants_more_kids ~ marital_formal + (1|age_gp) + (1|educ_cat), data = resp4, family = "binomial")
 summary(mod)
+
+mod_parity <- glmer(wants_more_kids ~ marital_formal + (1|age_gp) + (parity|educ_cat), data = resp4, family = "binomial")
+summary(mod_parity)
+ranef(mod_parity)
 ```
 
 Note! This can also be done in Stan, in a Bayesian framework. This is useful if you want to e.g. play around with the structure of the hierarchical model, which is much easier to control in this framework. 
@@ -91,9 +105,8 @@ stan_data1 <- list(N = nrow(resp4),
 
 mod1 <- stan(data = stan_data1, 
              file = "../code/models/intentions.stan",
-             iter = 1000,
-             seed = 243,
-             refresh=0)
+             iter = 500,
+             seed = 243)
 summary(mod1)$summary[c("beta0", "beta1", "beta2", "sigma_a", "sigma_e"),
                       c("mean", "se_mean", "n_eff", "Rhat")]
 ```
@@ -101,19 +114,25 @@ summary(mod1)$summary[c("beta0", "beta1", "beta2", "sigma_a", "sigma_e"),
 To pull out the estimates from `lme4`:
 
 ```{r}
+mod
 coef(mod)
 fixef(mod)
 ranef(mod)
 ```
 
-
 ## Question
 
 Compare the multilevel model with just a standard logistic regression. Which model has a higher AIC?
 
+```{r}
+summary(glm(wants_more_kids ~ marital_formal + age_gp + educ_cat, data = resp4, family = "binomial"))
+```
+
+
 # Post stratification
 
 We are interested in obtaining estimates for the proportion of women who want more kids by age. 
+
 ## Raw proportions by age
 
 Before we do any post-stratification, we can just calculate the raw survey proportions by age:
@@ -136,8 +155,34 @@ cell_counts <- read_csv("../data/acs_counts.csv")
 
 ## Question
 
-Compare proportions by age/education/marital group in ACS versus survey. 
+Compare proportions by age/education/marital status group in ACS versus survey. 
 
+```{r}
+cell_counts <- cell_counts |> 
+  mutate(prop = n / sum(n))
+
+sum(cell_counts$prop)
+
+survey_counts <- resp4 |> 
+  ungroup() |> 
+  group_by(age_gp, educ_cat, marital_formal) |> 
+  tally() |> 
+  ungroup() |> 
+  mutate(prop = n/sum(n))
+
+sum(survey_counts$prop)
+
+cell_counts |> 
+  rename(prop_acs = prop,
+         n_acs = n) |> 
+  left_join(survey_counts |> rename(marital = marital_formal, 
+                                    edu = educ_cat)) |> 
+  select(age_gp, edu, marital, prop_acs, prop) |> 
+  pivot_longer(prop_acs:prop) |> 
+  ggplot(aes(age_gp, value, fill = name)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  facet_grid(edu~marital)
+```
 
 
 ## Standard post-stratification
@@ -150,7 +195,7 @@ ps_age <- resp4 |>
   group_by(age_gp, edu, marital) |> 
   summarize(prop = mean(wants_more_kids, na.rm = TRUE)) |> 
   filter(marital !="Cohabitating") |> 
-  left_join(cell_counts) |> 
+  left_join(cell_counts |> select(-prop)) |> 
   mutate(prod = prop*n) |> 
   group_by(age_gp) |> 
   summarize(proportion = sum(prod)/sum(n)) |> 
@@ -180,7 +225,7 @@ Now post-stratify by age:
 ```{r}
 mrp_age <- pred_prop |> 
   rename(edu = educ_cat, marital = marital_formal) |> 
-  left_join(cell_counts) |> 
+  left_join(cell_counts |> select(-prop)) |> 
   mutate(prod = pred_mrp*n) |> 
   group_by(age_gp) |> 
   summarize(proportion = sum(prod)/sum(n)) |> 
