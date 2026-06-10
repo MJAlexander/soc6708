@@ -171,7 +171,7 @@ asmr |>
   geom_line()+
   scale_y_log10()+
   facet_wrap(~year)+
-  labs("Age- and sex-specific mortality rates for Canada")+
+  labs(x ="Age- and sex-specific mortality rates for Canada")+
   scale_color_brewer(palette = "Set1")
 ggsave(here("plots", "CAN_mortality.pdf"), width = 6, height = 4)
 ```
