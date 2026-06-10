@@ -12,6 +12,11 @@ All these data come from the [UN World Population Prospects 2024](https://popula
 
 Packages:
 ```{r}
+# in the root of the project, i.e., "/Hands_on/03_MonicaALabs/" folder where "03_MonicaALabs.Rproj" is located, open it and, do `renv::init()`
+
+# You need to run the following line to install required packages.
+# install.packages(c("tidyverse", "here", "readxl", "janitor"))
+
 library(tidyverse)
 library(here)
 library(readxl)
@@ -20,10 +25,12 @@ library(janitor)
 
 Population data:
 ```{r}
-d_male <- read_xlsx("../data/WPP2024_POP_F01_2_POPULATION_SINGLE_AGE_MALE.xlsx", skip = 16)
+d_male <- read_xlsx(here("data/WPP2024_POP_F01_2_POPULATION_SINGLE_AGE_MALE.xlsx"), skip = 16, col_types = "text") |>
+  mutate(Year = as.numeric(Year))
 d_male$sex <- "Male"
 d_male <- d_male |> drop_na(Year)
-d_female <- read_xlsx("../data/WPP2024_POP_F01_3_POPULATION_SINGLE_AGE_FEMALE.xlsx", skip = 16)
+d_female <- read_xlsx(here("data/WPP2024_POP_F01_3_POPULATION_SINGLE_AGE_FEMALE.xlsx"), skip = 16, col_types = "text") |>
+  mutate(Year = as.numeric(Year))
 d_female$sex <- "Female"
 d_female <- d_female |> drop_na(Year)
 
@@ -42,10 +49,12 @@ head(d)
 Mortality data:
 
 ```{r}
-d_male <- read_xlsx(here("data/WPP2024_MORT_F01_2_DEATHS_SINGLE_AGE_MALE.xlsx"), skip = 16)
+d_male <- read_xlsx(here("data/WPP2024_MORT_F01_2_DEATHS_SINGLE_AGE_MALE.xlsx"), skip = 16, col_types = "text") |>
+  mutate(Year = as.numeric(Year))
 d_male$sex <- "Male"
 d_male <- d_male |> drop_na(Year)
-d_female <- read_xlsx(here("data/WPP2024_MORT_F01_3_DEATHS_SINGLE_AGE_FEMALE.xlsx"), skip = 16)
+d_female <- read_xlsx(here("data/WPP2024_MORT_F01_3_DEATHS_SINGLE_AGE_FEMALE.xlsx"), skip = 16, col_types = "text") |>
+  mutate(Year = as.numeric(Year))
 d_female$sex <- "Female"
 d_female <- d_female |> drop_na(Year)
 
@@ -89,7 +98,7 @@ total_deaths <- dm  |>
 total_pops |> 
   left_join(total_deaths) |> 
   mutate(CDR = total_deaths/total_pop) |> 
-  ggplot(aes(year, CDR, color = region)) + 
+  ggplot(aes(x=year, y=CDR, color = region)) + 
   geom_line()
 
 total_pops |> 
