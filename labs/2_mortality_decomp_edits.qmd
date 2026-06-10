@@ -243,52 +243,69 @@ DO NOT DO!!!! MONICA GOT TOO EXCITED!!!
 Let's read in WPP data from last week and calculate the age-specific mortality rates:
 
 ```{r}
-d_male <- read_xlsx(here("data/WPP2024_POP_F01_2_POPULATION_SINGLE_AGE_MALE.xlsx"), skip = 16)
+d_male <- read_xlsx(
+  here("data/WPP2024_POP_F01_2_POPULATION_SINGLE_AGE_MALE.xlsx"),
+  skip = 16,
+  col_types = "text"
+) |>
+  mutate(Year = as.numeric(Year))
+
 d_male$sex <- "Male"
 d_male <- d_male |> drop_na(Year)
-d_female <- read_xlsx(here("data/WPP2024_POP_F01_3_POPULATION_SINGLE_AGE_FEMALE.xlsx"), skip = 16)
+d_female <- read_xlsx(
+  here("data/WPP2024_POP_F01_3_POPULATION_SINGLE_AGE_FEMALE.xlsx"),
+  skip = 16,
+  col_types = "text"
+) |>
+  mutate(Year = as.numeric(Year))
+
 d_female$sex <- "Female"
 d_female <- d_female |> drop_na(Year)
 
 d <- rbind(d_male, d_female)
 rm(d_male, d_female)
 
-d <- d  |> 
-  clean_names() |> 
-  select(region_subregion_country_or_area, iso3_alpha_code, year, x0:sex) |> 
-  rename(region = region_subregion_country_or_area) |> 
+d <- d |>
+  clean_names() |>
+  select(region_subregion_country_or_area, iso3_alpha_code, year, x0:sex) |>
+  rename(region = region_subregion_country_or_area) |>
   mutate(across(x0:x100, as.numeric))
 
-d_male <- read_xlsx(here("data/WPP2024_MORT_F01_2_DEATHS_SINGLE_AGE_MALE.xlsx"), skip = 16)
+d_male <- read_xlsx(
+  here("data/WPP2024_MORT_F01_2_DEATHS_SINGLE_AGE_MALE.xlsx"),
+  skip = 16
+)
 d_male$sex <- "Male"
 d_male <- d_male |> drop_na(Year)
-d_female <- read_xlsx(here("data/WPP2024_MORT_F01_3_DEATHS_SINGLE_AGE_FEMALE.xlsx"), skip = 16)
+d_female <- read_xlsx(
+  here("data/WPP2024_MORT_F01_3_DEATHS_SINGLE_AGE_FEMALE.xlsx"),
+  skip = 16
+)
 d_female$sex <- "Female"
 d_female <- d_female |> drop_na(Year)
 
 dm <- rbind(d_male, d_female)
 rm(d_male, d_female)
 
-dm <- dm  |> 
-  clean_names() |> 
-  select(region_subregion_country_or_area, iso3_alpha_code, year, x0:sex) |> 
-  rename(region = region_subregion_country_or_area) |> 
+dm <- dm |>
+  clean_names() |>
+  select(region_subregion_country_or_area, iso3_alpha_code, year, x0:sex) |>
+  rename(region = region_subregion_country_or_area) |>
   mutate(across(x0:x100, as.numeric))
 
-d_long <- d  |>  
-  pivot_longer(x0:x100, names_to = "age", values_to = "pop") |> 
+d_long <- d |>
+  pivot_longer(x0:x100, names_to = "age", values_to = "pop") |>
   mutate(age = as.numeric(str_remove(age, "x")))
 
-dm_long <- dm  |>  
-  pivot_longer(x0:x100, names_to = "age", values_to = "deaths") |> 
+dm_long <- dm |>
+  pivot_longer(x0:x100, names_to = "age", values_to = "deaths") |>
   mutate(age = as.numeric(str_remove(age, "x")))
 
 # join these two tibbles and calculate rates
 
-asmr <- d_long |> 
-  left_join(dm_long) |> 
-  mutate(mx = deaths/pop)
-
+asmr <- d_long |>
+  left_join(dm_long) |>
+  mutate(mx = deaths / pop)
 ```
 
 Do the decomposition of the difference between Kenya and Canada:
