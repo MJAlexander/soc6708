@@ -12,7 +12,7 @@ All these data come from the [UN World Population Prospects 2024](https://popula
 
 Packages:
 ```{r}
-# in the root of the project, i.e., "/Hands_on/03_MonicaALabs/" folder where "03_MonicaALabs.Rproj" is located, open it and, do `renv::init()`
+# If you wish to use `renv` package to handle R packages and dependency to keep your work reproducible (at least slightly, the next level would be to use a Rocker image to dockerize the code using containers) in the root of the project folder where "example-proj-name.Rproj" is located, open it and, do `renv::init()`. You need to have `renv` package installed, i.e., install.packages(c("renv")).
 
 # You need to run the following line to install required packages.
 # install.packages(c("tidyverse", "here", "readxl", "janitor"))
