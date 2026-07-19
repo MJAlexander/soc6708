@@ -11,18 +11,26 @@ execute:
 # NRRs
 
 ```{r}
+# Load required libraries for data manipulation, file path handling, reading Excel files, and cleaning data
 library(tidyverse)
 library(here)
 library(readxl)
 library(janitor)
 ```
 
-Read in WPP data (you will need to download the first two files from the UNPD website):
+Read in WPP data (you will need to download the first two files from the UNPD website).
+
 
 ```{r}
-df <- read_csv("../data/WPP2024_Fertility_by_Age5.csv")
-dl <- read_csv("../data/WPP2024_Life_Table_Abridged_Medium_1950-2023.csv")
-dp <- read_csv("../data/wpp_pop_clean.csv")
+
+# Read UN World Population Prospects (WPP) 2024 datasets from the local data directory
+# df: Age-specific fertility rates (ASFR) grouped by 5-year age intervals
+df <- read_csv(here("data/WPP2024_Fertility_by_Age5.csv"))
+# dl: Abridged life tables under the medium projection variant (1950-2023)
+dl <- read_csv(here("data/WPP2024_Life_Table_Abridged_Medium_1950-2023.csv"))
+# dp: Pre-cleaned population counts and structure data
+dp <- read_csv(here("data/wpp_pop_clean.csv"))
+
 ```
 
 ## Exercise
@@ -30,30 +38,39 @@ dp <- read_csv("../data/wpp_pop_clean.csv")
 Choose three countries in varying demographic stages and calculate and plot the NRR over time. Also plot population pyramids for these same countries (one recent, one from 1970) and discuss how population growth/decline and NRR are related. 
 
 ```{r}
-fx_mex <- df |> 
-  filter(Location == "Mexico", Variant == "Medium") |> 
-  select(Location, Time, AgeGrp, ASFR) |> 
-  mutate(ASFR = ASFR/1000)
+# Step 1: Filter and prepare fertility rates for Mexico (medium variant)
+# We divide ASFR by 1000 to convert from births per 1,000 women to births per individual woman
+fx_mex <- df |>
+  filter(Location == "Mexico", Variant == "Medium") |>
+  select(Location, Time, AgeGrp, ASFR) |>
+  mutate(ASFR = ASFR / 1000)
 
-lx_mex <- dl |> 
-  filter(Location == "Mexico", Sex == "Female") |> 
-  select(Location, Time, AgeGrp, Lx) |> 
+# Step 2: Filter and prepare female survivorship (Lx) for Mexico
+# We divide Lx by 100,000 to convert the cohort scale of 100,000 to a proportion (0 to 1 scale)
+lx_mex <- dl |>
+  filter(Location == "Mexico", Sex == "Female") |>
+  select(Location, Time, AgeGrp, Lx) |>
   mutate(Lx = Lx / 100000)
 
+# Step 3: Define the biological fraction of female births at birth (approximately 100 females per 105 males)
 ffab <- 0.4886
 
-nrrs <- fx_mex |> 
-  left_join(lx_mex) |> 
-  mutate(prod = ASFR*Lx) |> 
-  group_by(Time) |> 
-  summarize(NRR = sum(prod)*ffab) |> 
+# Step 4: Join fertility and survivorship data to calculate the Net Reproduction Rate (NRR) over time
+# NRR = sum(ASFR_x * Lx_female) * fraction_female_births
+nrrs <- fx_mex |>
+  left_join(lx_mex) |>
+  mutate(prod = ASFR * Lx) |>
+  group_by(Time) |>
+  summarize(NRR = sum(prod) * ffab) |>
   drop_na()
 
-nrrs |> 
-  ggplot(aes(Time, NRR)) + 
-  geom_line()+
-  labs(title = "NRR for Mexico")
+# from slides on fertility, page 41: "Note the n Lx refers to the survivorship of women."
 
+# Step 5: Plot Mexico's NRR trajectory over time
+nrrs |>
+  ggplot(aes(Time, NRR)) +
+  geom_line() +
+  labs(title = "NRR for Mexico")
 ```
 
 
@@ -62,40 +79,47 @@ nrrs |>
 For this section, I pulled Canadian census data from 2011 from [IPUMS](https://international.ipums.org/international/) and did some reshaping to get mothers and their children:
 
 ```{r}
-d <- read_csv("../data/canada_parity.csv")
+d <- read_csv(here("data/canada_parity.csv"))
 ```
 
 Let's look at sex ratios by parity:
 
 ```{r}
+# Filter data to include only children who are under 21 years old
 dy <- d |> 
   filter(child_age_1<21)
 
+# Calculate the proportion of female children (where sex value is 2) for the 1st born child, grouped by child's age
 pf1 <- dy |> 
   group_by(child_age_1) |> 
   summarise(prop_female1 = sum(child_sex_1==2)/n()) |> 
   rename(age = child_age_1)
 
+# Calculate the proportion of female children for the 2nd born child, grouped by child's age
 pf2 <- dy |> 
   group_by(child_age_2) |> 
   summarise(prop_female2 = sum(child_sex_2==2)/n()) |> 
   rename(age = child_age_2)
 
+# Calculate the proportion of female children for the 3rd born child, grouped by child's age
 pf3 <- dy |> 
   group_by(child_age_3) |> 
   summarise(prop_female3 = sum(child_sex_3==2)/n()) |> 
   rename(age = child_age_3)
 
-
+# Join the proportion datasets, reshape to long format, and plot the proportion of females by age and parity
 pf1 |> 
   left_join(pf2) |> 
   left_join(pf3) |>
   pivot_longer(-age, names_to = "parity", values_to = "prop_female") |> 
+  # Extract the parity number from the column name
   mutate(parity = as.numeric(substr(parity, nchar(parity), nchar(parity)))) |> 
   ggplot(aes(age, prop_female, color = factor(parity))) + 
   geom_line(alpha = 0.5) + 
   ggtitle("Proportion of females by age and parity") +
+  # Add a horizontal line at the expected biological sex ratio (0.4886 female)
   geom_hline(yintercept = 0.4886)+
+  # Add a horizontal trendline (mean proportion) to help see any deviation across ages
   geom_smooth(method = "lm", se = F, formula = y ~ 1)+
   scale_color_discrete(name = "Parity")+
   labs(y = "proportion female", x = "age of child")
@@ -105,11 +129,15 @@ pf1 |>
 Now let's look at parity progression from 1 to 2 based on sex of first child:
 
 ```{r}
+# Calculate Parity Progression Ratio (PPR) from 1st to 2nd child
+# This is the proportion of mothers with at least 1 child who go on to have more than 1 child,
+# grouped by the first child's age and sex (1 = Male, 2 = Female)
 ppr1 <- dy |> 
   group_by(child_age_1, child_sex_1) |> 
   summarise(ppr1 = sum(nchild>1)/n()) |> 
   rename(sex = child_sex_1, age = child_age_1)
 
+# Plot the PPR from 1st to 2nd child comparing mothers of first-born girls vs first-born boys
 ppr1 |> 
   rename(ppr = ppr1) |> 
   mutate(sex = ifelse(sex==2, 
@@ -123,6 +151,8 @@ ppr1 |>
 What about from 2 to 3, based on the sex of the first two?
 
 ```{r}
+# Calculate Parity Progression Ratio (PPR) from 2nd to 3rd child for mothers whose first child was male
+# We filter for second children under 16 years old, then group by second child's age and sex
 ppr2_m <- dy |> 
   filter(child_age_2<16) |> 
   filter(child_sex_1==1) |> 
@@ -131,6 +161,7 @@ ppr2_m <- dy |>
   rename(sex = child_sex_2, age = child_age_2) |> 
   mutate(sex1 = "first born is male")
 
+# Calculate Parity Progression Ratio (PPR) from 2nd to 3rd child for mothers whose first child was female
 ppr2_f <- dy |> 
   filter(child_age_2<16) |> 
   filter(child_sex_1==2) |> 
@@ -139,6 +170,8 @@ ppr2_f <- dy |>
   rename(sex = child_sex_2, age = child_age_2) |> 
   mutate(sex1 = "first born is female")
 
+# Combine both cohorts and plot the PPR to a third child,
+# faceted by the sex of the first child and colored by the sex of the second child
 ppr2_m |> 
   bind_rows(ppr2_f) |> 
   mutate(sex = ifelse(sex == 1, "Male", "Female")) |> 
@@ -162,6 +195,7 @@ ppr2_m <- dy |>
   rename(sex = child_sex_2, age = age_group) |> 
   mutate(sex1 = "first born is male")
 
+# First-born female path:
 ppr2_f <- dy |> 
   filter(child_age_2<16) |> 
   filter(child_sex_1==2) |> 
@@ -170,6 +204,8 @@ ppr2_f <- dy |>
   rename(sex = child_sex_2, age = age_group) |> 
   mutate(sex1 = "first born is female")
 
+# Combine both cohorts and plot the PPR to a third child against mother's age group,
+# faceted by the sex of the first child and colored by the sex of the second child
 ppr2_m |> 
   bind_rows(ppr2_f) |> 
   mutate(sex = ifelse(sex == 1, "Male", "Female")) |> 
